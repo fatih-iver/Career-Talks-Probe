@@ -25,7 +25,7 @@ def trigger_anchor_automator(video_id):
     global failed_video_ids
     try:
         print(threading.get_ident(), "automation started for", str(video_id))
-        response = requests.post(url, params={"videoId": video_id})
+        response = requests.get(url, params={"videoId": video_id})
         print(threading.get_ident(), "automation finished for", str(video_id))
         if response.status_code != 200:
             print(threading.get_ident(), "request failed for", str(video_id), response.status_code, response.content)
@@ -74,7 +74,6 @@ def probe():
         video_id_to_title[video_id] = title
 
         description = candidate_video["snippet"]["description"]
-        description = "Kariyer Sohbetleri" + description
         if description.lstrip().startswith("Kariyer Sohbetleri"):
             career_talks_video_ids.append(video_id)
 
@@ -104,7 +103,7 @@ def send_mail(subject, content):
         sg = sendgrid.SendGridAPIClient()
         sg.send(mail)
     except Exception as e:
-        print("exception occurred while sending mail", e)
+        print("exception occurred while sending mail", repr(e))
 
 
 def send_start_mail():
@@ -172,7 +171,7 @@ def probe_trigger(request):
         send_finish_mail()
     except Exception as e:
         print("failed: probe triggered")
-        print(e)
+        print(repr(e))
         send_fail_mail(repr(e))
     print("end: probe triggered")
     return "", 200
