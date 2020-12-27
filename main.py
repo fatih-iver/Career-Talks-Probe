@@ -8,7 +8,7 @@ import sendgrid as sendgrid
 from googleapiclient.discovery import build
 from sendgrid import Email, To, Content, Mail
 
-url = os.getenv("ANCHOR_AUTOMATOR_ADDRESS")
+receiving_service_url = os.getenv("ANCHOR_AUTOMATOR_ADDRESS")
 lock = threading.Lock()
 date_of_x_days_ago = datetime.date.today() - datetime.timedelta(days=int(os.getenv("PROBE_FOR_X_DAYS_AGO")))
 
@@ -23,12 +23,20 @@ video_id_to_title = {}
 
 def trigger_anchor_automator(video_id):
     global failed_video_ids
+    print(threading.get_ident(), "automation started for", str(video_id))
     try:
-        print(threading.get_ident(), "automation started for", str(video_id))
-        response = requests.get(url, params={"videoId": video_id})
-        print(threading.get_ident(), "automation finished for", str(video_id))
-        if response.status_code != 200:
-            print(threading.get_ident(), "request failed for", str(video_id), response.status_code, response.content)
+        metadata_server_token_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts" \
+                                    "/default/identity?audience="
+        token_request_url = metadata_server_token_url + receiving_service_url
+        token_request_headers = {'Metadata-Flavor': 'Google'}
+        token_response = requests.get(token_request_url, headers=token_request_headers)
+        jwt = token_response.content.decode("utf-8")
+        receiving_service_headers = {"Authorization": f"Bearer {jwt}"}
+        service_response = requests.get(receiving_service_url, headers=receiving_service_headers,
+                                        params={"videoId": video_id})
+        if service_response.status_code != 200:
+            print(threading.get_ident(), "request failed for", str(video_id), service_response.status_code,
+                  service_response.content)
             with lock:
                 failed_video_ids.append(video_id)
     except Exception as e:
@@ -36,6 +44,7 @@ def trigger_anchor_automator(video_id):
         print(threading.get_ident(), repr(e))
         with lock:
             failed_video_ids.append(video_id)
+    print(threading.get_ident(), "automation finished for", str(video_id))
 
 
 def probe():
